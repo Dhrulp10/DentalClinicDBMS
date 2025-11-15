@@ -25,6 +25,7 @@ pip3 install oracledb
 1. Install required packages:
 ```bash
 pip install -r requirements.txt
+```
 
-
-
+## Executable
+pyinstaller can be used to package this application for users
