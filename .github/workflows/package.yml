@@ -2,7 +2,7 @@ name: Build PyInstaller App (Windows + macOS)
 
 on:
   push:
-    branches: [ none ] # Replace 'none' with 'main' to enable on pushes to main branch
+    branches: [ main ]
   pull_request:
 
 jobs:
