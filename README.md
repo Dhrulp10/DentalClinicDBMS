@@ -20,7 +20,6 @@ A comprehensive Python GUI application for managing a dental clinic database usi
 - Oracle database access (oracle.scs.ryerson.ca)
 
 ## Installation
-2. Install oraclebd 
 
 pip install oracledb 
 pip3 install oracledb
@@ -28,6 +27,8 @@ pip3 install oracledb
 ```bash
 pip install -r requirements.txt
 ```
+2. Install oraclebd 
+
 
 ## Executable
 pyinstaller can be used to package this application for users
