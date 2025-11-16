@@ -31,11 +31,7 @@ jobs:
     # Adjust SQL filenames if needed
     - name: Build executable with PyInstaller
       run: |
-        pyinstaller --onefile \
-          --add-data "create_tables.sql:." \
-          --add-data "drop_tables.sql:." \
-          --add-data "populate_tables.sql:." \
-          main.py
+        pyinstaller --onefile main.py
 
     - name: Upload artifact
       uses: actions/upload-artifact@v4
