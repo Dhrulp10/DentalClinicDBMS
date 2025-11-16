@@ -430,6 +430,10 @@ class DentalClinicApp:
         self.cursor = cursor
         self.db_file = "dental_clinic.db"
         
+        # Track current table and selected row
+        self.current_table = None
+        self.selected_row = None
+        
         # Setup UI
         self.setup_ui()
         
@@ -450,6 +454,7 @@ class DentalClinicApp:
         self.tables_frame = ttk.Frame(self.notebook)
         self.schema_frame = ttk.Frame(self.notebook)
         self.sql_frame = ttk.Frame(self.notebook)
+        self.search_frame = ttk.Frame(self.notebook)
         
         # Add tabs to notebook
         self.notebook.add(self.dashboard_frame, text="🏠 Dashboard")
@@ -457,12 +462,14 @@ class DentalClinicApp:
         self.notebook.add(self.tables_frame, text="📊 Browse Tables")
         self.notebook.add(self.schema_frame, text="📋 Schema")
         self.notebook.add(self.sql_frame, text="⚡ SQL Console")
+        self.notebook.add(self.search_frame, text="🔎 Search Records")
         
         self.setup_dashboard()
         self.setup_query_frame()
         self.setup_tables_frame()
         self.setup_schema_frame()
         self.setup_sql_frame()
+        self.setup_search_frame()
     
     def setup_styles(self):
         style = ttk.Style()
@@ -476,6 +483,7 @@ class DentalClinicApp:
         style.configure('Success.TLabel', foreground='#27ae60', font=('Arial', 9))
         style.configure('Warning.TLabel', foreground='#e67e22', font=('Arial', 9))
         style.configure('Custom.TButton', font=('Arial', 10), padding=(10, 5))
+        style.configure('Danger.TButton', font=('Arial', 10), padding=(10, 5), background='#e74c3c')
     
     def setup_dashboard(self):
         # Header
@@ -531,7 +539,8 @@ class DentalClinicApp:
             ("📊 View All Tables", "Browse all database tables", lambda: self.notebook.select(2)),
             ("🔍 Run Queries", "Execute analytical queries", lambda: self.notebook.select(1)),
             ("📋 View Schema", "Database structure overview", lambda: self.notebook.select(3)),
-            ("⚡ SQL Console", "Execute custom SQL commands", lambda: self.notebook.select(4))
+            ("⚡ SQL Console", "Execute custom SQL commands", lambda: self.notebook.select(4)),
+            ("🔎 Search Records", "Search for specific records", lambda: self.notebook.select(5))
         ]
         
         for i, (text, description, command) in enumerate(actions):
@@ -635,6 +644,20 @@ class DentalClinicApp:
         ttk.Button(table_selection_frame, text="Refresh", command=self.populate_table_list, 
                   style='Custom.TButton').pack(side=tk.LEFT, padx=5)
         
+        # Table actions frame
+        actions_frame = ttk.Frame(selection_frame)
+        actions_frame.pack(fill=tk.X, pady=10)
+        
+        ttk.Button(actions_frame, text="➕ Add New Record", command=self.add_record, 
+                  style='Custom.TButton').pack(side=tk.LEFT, padx=5)
+        ttk.Button(actions_frame, text="✏️ Edit Selected", command=self.edit_record, 
+                  style='Custom.TButton').pack(side=tk.LEFT, padx=5)
+        ttk.Button(actions_frame, text="🗑️ Delete Selected", command=self.delete_record, 
+                  style='Danger.TButton').pack(side=tk.LEFT, padx=5)
+        
+        self.table_action_status = ttk.Label(actions_frame, text="", style='Success.TLabel')
+        self.table_action_status.pack(side=tk.LEFT, padx=10)
+        
         # Table display
         table_display_frame = ttk.LabelFrame(self.tables_frame, text="Table Data", padding=10)
         table_display_frame.pack(fill=tk.BOTH, expand=True, pady=10, padx=10)
@@ -664,6 +687,19 @@ class DentalClinicApp:
         
         tree_frame.grid_rowconfigure(0, weight=1)
         tree_frame.grid_columnconfigure(0, weight=1)
+        
+        # Bind double-click to edit
+        self.table_tree.bind('<Double-1>', lambda e: self.edit_record())
+        
+        # Bind selection
+        self.table_tree.bind('<<TreeviewSelect>>', self.on_table_select)
+    
+    def on_table_select(self, event):
+        selection = self.table_tree.selection()
+        if selection:
+            self.selected_row = self.table_tree.item(selection[0])['values']
+        else:
+            self.selected_row = None
     
     def setup_schema_frame(self):
         # Header with refresh button
@@ -719,6 +755,474 @@ class DentalClinicApp:
         self.sql_results = scrolledtext.ScrolledText(results_frame, wrap=tk.WORD, font=('Consolas', 10))
         self.sql_results.pack(fill=tk.BOTH, expand=True)
     
+    def setup_search_frame(self):
+        # Search configuration section
+        search_config_frame = ttk.LabelFrame(self.search_frame, text="Search Configuration", padding=15)
+        search_config_frame.pack(fill=tk.X, pady=10, padx=10)
+        
+        # Table selection
+        ttk.Label(search_config_frame, text="Search in Table:", font=('Arial', 11, 'bold')).pack(anchor='w', pady=5)
+        
+        table_frame = ttk.Frame(search_config_frame)
+        table_frame.pack(fill=tk.X, pady=5)
+        
+        self.search_table_var = tk.StringVar()
+        self.search_table_combo = ttk.Combobox(table_frame, textvariable=self.search_table_var, 
+                                              state="readonly", width=40, font=('Arial', 10))
+        self.search_table_combo.pack(side=tk.LEFT, padx=5)
+        
+        # Column selection
+        ttk.Label(search_config_frame, text="Search in Column:", font=('Arial', 11, 'bold')).pack(anchor='w', pady=5)
+        
+        column_frame = ttk.Frame(search_config_frame)
+        column_frame.pack(fill=tk.X, pady=5)
+        
+        self.search_column_var = tk.StringVar()
+        self.search_column_combo = ttk.Combobox(column_frame, textvariable=self.search_column_var, 
+                                               state="readonly", width=40, font=('Arial', 10))
+        self.search_column_combo.pack(side=tk.LEFT, padx=5)
+        
+        # Search term
+        ttk.Label(search_config_frame, text="Search Term:", font=('Arial', 11, 'bold')).pack(anchor='w', pady=5)
+        
+        search_term_frame = ttk.Frame(search_config_frame)
+        search_term_frame.pack(fill=tk.X, pady=5)
+        
+        self.search_term_var = tk.StringVar()
+        self.search_entry = ttk.Entry(search_term_frame, textvariable=self.search_term_var, 
+                                     width=50, font=('Arial', 10))
+        self.search_entry.pack(side=tk.LEFT, padx=5)
+        
+        # Search type
+        self.search_type_var = tk.StringVar(value="contains")
+        search_type_frame = ttk.Frame(search_term_frame)
+        search_type_frame.pack(side=tk.LEFT, padx=10)
+        
+        ttk.Radiobutton(search_type_frame, text="Contains", variable=self.search_type_var, 
+                       value="contains").pack(side=tk.LEFT)
+        ttk.Radiobutton(search_type_frame, text="Starts With", variable=self.search_type_var, 
+                       value="startswith").pack(side=tk.LEFT)
+        ttk.Radiobutton(search_type_frame, text="Exact Match", variable=self.search_type_var, 
+                       value="exact").pack(side=tk.LEFT)
+        
+        # Search button
+        button_frame = ttk.Frame(search_config_frame)
+        button_frame.pack(fill=tk.X, pady=10)
+        
+        ttk.Button(button_frame, text="Search", command=self.execute_search, 
+                  style='Custom.TButton').pack(side=tk.LEFT, padx=5)
+        ttk.Button(button_frame, text="Clear Results", 
+                  command=self.clear_search_results).pack(side=tk.LEFT, padx=5)
+        
+        self.search_status = ttk.Label(button_frame, text="", style='Success.TLabel')
+        self.search_status.pack(side=tk.LEFT, padx=10)
+        
+        # Quick search examples
+        examples_frame = ttk.Frame(search_config_frame)
+        examples_frame.pack(fill=tk.X, pady=10)
+        
+        ttk.Label(examples_frame, text="Quick Searches:", font=('Arial', 10, 'bold')).pack(anchor='w')
+        
+        examples_buttons_frame = ttk.Frame(examples_frame)
+        examples_buttons_frame.pack(fill=tk.X, pady=5)
+        
+        examples = [
+            ("Find John", "Patient", "full_name", "John"),
+            ("Toronto Patients", "Patient", "city", "Toronto"),
+            ("Scheduled Appointments", "Appointment", "status", "SCHEDULED"),
+            ("High Cost Treatments", "Dental_Action", "cost", "200"),
+            ("Unpaid Bills", "Bill", "status", "UNPAID")
+        ]
+        
+        for text, table, column, term in examples:
+            btn = ttk.Button(examples_buttons_frame, text=text, 
+                           command=lambda t=table, c=column, term=term: self.setup_quick_search(t, c, term),
+                           width=15)
+            btn.pack(side=tk.LEFT, padx=2)
+        
+        # Results section
+        results_frame = ttk.LabelFrame(self.search_frame, text="Search Results", padding=10)
+        results_frame.pack(fill=tk.BOTH, expand=True, pady=10, padx=10)
+        
+        # Results info
+        self.search_results_info = ttk.Label(results_frame, text="No search performed yet", 
+                                           font=('Arial', 9), foreground='#666')
+        self.search_results_info.pack(anchor='w', pady=5)
+        
+        # Create a frame to hold treeview and scrollbars
+        tree_frame = ttk.Frame(results_frame)
+        tree_frame.pack(fill=tk.BOTH, expand=True)
+        
+        # Treeview for search results
+        self.search_tree = ttk.Treeview(tree_frame, show='headings')
+        
+        # Scrollbars
+        v_scrollbar = ttk.Scrollbar(tree_frame, orient=tk.VERTICAL, command=self.search_tree.yview)
+        h_scrollbar = ttk.Scrollbar(tree_frame, orient=tk.HORIZONTAL, command=self.search_tree.xview)
+        
+        self.search_tree.configure(yscrollcommand=v_scrollbar.set, xscrollcommand=h_scrollbar.set)
+        
+        # Grid layout for proper scrollbar positioning
+        self.search_tree.grid(row=0, column=0, sticky='nsew')
+        v_scrollbar.grid(row=0, column=1, sticky='ns')
+        h_scrollbar.grid(row=1, column=0, sticky='ew')
+        
+        tree_frame.grid_rowconfigure(0, weight=1)
+        tree_frame.grid_columnconfigure(0, weight=1)
+        
+        # Bind table selection to update columns
+        self.search_table_combo.bind('<<ComboboxSelected>>', self.update_search_columns)
+        
+        # Populate tables for search
+        self.populate_search_tables()
+    
+    def populate_search_tables(self):
+        if not self.cursor:
+            return
+        
+        try:
+            self.cursor.execute("SELECT name FROM sqlite_master WHERE type='table' ORDER BY name")
+            tables = [table[0] for table in self.cursor.fetchall()]
+            self.search_table_combo['values'] = tables
+            self.table_combo['values'] = tables  # Also update the table browser combo
+            
+            if tables:
+                self.search_table_combo.set(tables[0])
+                self.update_search_columns()
+        except Exception as e:
+            print(f"Error loading tables: {str(e)}")
+            messagebox.showerror("Error", f"Failed to load tables: {str(e)}")
+    
+    def update_search_columns(self, event=None):
+        table_name = self.search_table_var.get()
+        if not table_name:
+            return
+        
+        try:
+            self.cursor.execute(f"PRAGMA table_info({table_name})")
+            columns = [col[1] for col in self.cursor.fetchall()]
+            self.search_column_combo['values'] = columns
+            if columns:
+                self.search_column_combo.set(columns[0])
+        except Exception as e:
+            print(f"Error loading columns: {str(e)}")
+    
+    def setup_quick_search(self, table, column, term):
+        self.search_table_var.set(table)
+        self.update_search_columns()
+        self.search_column_var.set(column)
+        self.search_term_var.set(term)
+        self.execute_search()
+    
+    def execute_search(self):
+        table_name = self.search_table_var.get()
+        column_name = self.search_column_var.get()
+        search_term = self.search_term_var.get()
+        search_type = self.search_type_var.get()
+        
+        if not table_name or not column_name or not search_term:
+            messagebox.showwarning("Warning", "Please select a table, column, and enter a search term.")
+            return
+        
+        try:
+            # Clear previous results
+            for item in self.search_tree.get_children():
+                self.search_tree.delete(item)
+            self.search_tree["columns"] = []
+            
+            # Build search query based on search type
+            if search_type == "contains":
+                query = f"SELECT * FROM {table_name} WHERE {column_name} LIKE ?"
+                params = (f'%{search_term}%',)
+            elif search_type == "startswith":
+                query = f"SELECT * FROM {table_name} WHERE {column_name} LIKE ?"
+                params = (f'{search_term}%',)
+            else:  # exact match
+                query = f"SELECT * FROM {table_name} WHERE {column_name} = ?"
+                params = (search_term,)
+            
+            # Execute search
+            self.cursor.execute(query, params)
+            rows = self.cursor.fetchall()
+            
+            # Get column names
+            self.cursor.execute(f"PRAGMA table_info({table_name})")
+            columns = [col[1] for col in self.cursor.fetchall()]
+            
+            # Configure treeview
+            self.search_tree["columns"] = columns
+            for col in columns:
+                self.search_tree.heading(col, text=col)
+                self.search_tree.column(col, width=120, minwidth=50)
+            
+            # Insert data
+            for row in rows:
+                self.search_tree.insert("", tk.END, values=row)
+            
+            # Update status
+            self.search_status.config(text=f"✅ Found {len(rows)} records")
+            self.search_results_info.config(text=f"Found {len(rows)} records in {table_name} where {column_name} {search_type} '{search_term}'")
+            
+        except Exception as e:
+            messagebox.showerror("Search Error", f"Failed to execute search:\n{str(e)}")
+            self.search_status.config(text="❌ Search failed")
+    
+    def clear_search_results(self):
+        for item in self.search_tree.get_children():
+            self.search_tree.delete(item)
+        self.search_tree["columns"] = []
+        self.search_results_info.config(text="No search performed yet")
+        self.search_status.config(text="")
+    
+    # NEW METHODS FOR TABLE MODIFICATION
+    def add_record(self):
+        table_name = self.table_var.get()
+        if not table_name:
+            messagebox.showwarning("Warning", "Please select a table first.")
+            return
+        
+        # Get column information
+        self.cursor.execute(f"PRAGMA table_info({table_name})")
+        columns = self.cursor.fetchall()
+        
+        # Create edit dialog
+        self.create_edit_dialog(table_name, columns, None, "Add New Record")
+    
+    def edit_record(self):
+        if not self.selected_row:
+            messagebox.showwarning("Warning", "Please select a record to edit.")
+            return
+        
+        table_name = self.table_var.get()
+        if not table_name:
+            messagebox.showwarning("Warning", "Please select a table first.")
+            return
+        
+        # Get column information
+        self.cursor.execute(f"PRAGMA table_info({table_name})")
+        columns = self.cursor.fetchall()
+        
+        # Create edit dialog
+        self.create_edit_dialog(table_name, columns, self.selected_row, "Edit Record")
+    
+    def create_edit_dialog(self, table_name, columns, row_data, title):
+        dialog = tk.Toplevel(self.root)
+        dialog.title(title)
+        dialog.geometry("500x600")
+        dialog.configure(bg='#f5f5f5')
+        dialog.transient(self.root)
+        dialog.grab_set()
+        
+        # Center the dialog
+        dialog.update_idletasks()
+        width = dialog.winfo_width()
+        height = dialog.winfo_height()
+        x = (dialog.winfo_screenwidth() // 2) - (width // 2)
+        y = (dialog.winfo_screenheight() // 2) - (height // 2)
+        dialog.geometry(f'500x600+{x}+{y}')
+        
+        # Main frame
+        main_frame = ttk.Frame(dialog, padding=20)
+        main_frame.pack(fill=tk.BOTH, expand=True)
+        
+        ttk.Label(main_frame, text=f"{title} - {table_name}", 
+                 font=('Arial', 14, 'bold')).pack(pady=10)
+        
+        # Create form frame
+        form_frame = ttk.Frame(main_frame)
+        form_frame.pack(fill=tk.BOTH, expand=True, pady=10)
+        
+        entry_widgets = {}
+        
+        # Create form fields
+        for i, col in enumerate(columns):
+            col_name, col_type, not_null, default_val, pk = col[1], col[2], col[3], col[4], col[5]
+            
+            # Create label
+            label_text = f"{col_name} ({col_type})"
+            if pk:
+                label_text += " 🔑"
+            if not_null:
+                label_text += " *"
+                
+            ttk.Label(form_frame, text=label_text, font=('Arial', 10)).grid(
+                row=i, column=0, sticky='w', pady=5, padx=5)
+            
+            # Create entry widget
+            if col_type.upper() in ('TEXT', 'VARCHAR', 'CHAR'):
+                entry = ttk.Entry(form_frame, width=40, font=('Arial', 10))
+            elif col_type.upper() in ('INTEGER', 'INT'):
+                entry = ttk.Entry(form_frame, width=40, font=('Arial', 10))
+                # Add validation for integers
+                entry.configure(validate='key', validatecommand=(dialog.register(self.validate_int), '%P'))
+            elif col_type.upper() in ('REAL', 'FLOAT', 'DECIMAL'):
+                entry = ttk.Entry(form_frame, width=40, font=('Arial', 10))
+                # Add validation for floats
+                entry.configure(validate='key', validatecommand=(dialog.register(self.validate_float), '%P'))
+            else:
+                entry = ttk.Entry(form_frame, width=40, font=('Arial', 10))
+            
+            # Set default value if editing existing record
+            if row_data and i < len(row_data):
+                entry.insert(0, str(row_data[i]))
+            
+            entry.grid(row=i, column=1, sticky='ew', pady=5, padx=5)
+            entry_widgets[col_name] = entry
+        
+        form_frame.columnconfigure(1, weight=1)
+        
+        # Button frame
+        button_frame = ttk.Frame(main_frame)
+        button_frame.pack(fill=tk.X, pady=20)
+        
+        if title == "Add New Record":
+            ttk.Button(button_frame, text="Add Record", 
+                      command=lambda: self.save_record(dialog, table_name, entry_widgets, columns, False),
+                      style='Custom.TButton').pack(side=tk.LEFT, padx=5)
+        else:
+            ttk.Button(button_frame, text="Update Record", 
+                      command=lambda: self.save_record(dialog, table_name, entry_widgets, columns, True),
+                      style='Custom.TButton').pack(side=tk.LEFT, padx=5)
+        
+        ttk.Button(button_frame, text="Cancel", 
+                  command=dialog.destroy).pack(side=tk.LEFT, padx=5)
+    
+    def validate_int(self, value):
+        if value == "" or value.isdigit():
+            return True
+        return False
+    
+    def validate_float(self, value):
+        if value == "":
+            return True
+        try:
+            float(value)
+            return True
+        except ValueError:
+            return False
+    
+    def save_record(self, dialog, table_name, entry_widgets, columns, is_edit):
+        try:
+            # Build column names and values
+            col_names = []
+            values = []
+            primary_key_col = None
+            primary_key_value = None
+            
+            for col in columns:
+                col_name = col[1]
+                col_type = col[2]
+                is_pk = col[5]
+                
+                value = entry_widgets[col_name].get()
+                
+                # Handle empty values
+                if value == "":
+                    if is_pk and not is_edit:  # PK can be empty for new records (auto-increment)
+                        continue
+                    value = None
+                else:
+                    # Convert based on type
+                    if col_type.upper() in ('INTEGER', 'INT'):
+                        value = int(value)
+                    elif col_type.upper() in ('REAL', 'FLOAT', 'DECIMAL'):
+                        value = float(value)
+                
+                if is_pk:
+                    primary_key_col = col_name
+                    primary_key_value = value
+                
+                col_names.append(col_name)
+                values.append(value)
+            
+            if is_edit:
+                # Update existing record
+                if not primary_key_col or primary_key_value is None:
+                    messagebox.showerror("Error", "Cannot update record without primary key.")
+                    return
+                
+                set_clause = ", ".join([f"{col} = ?" for col in col_names])
+                query = f"UPDATE {table_name} SET {set_clause} WHERE {primary_key_col} = ?"
+                
+                # Add primary key value at the end for WHERE clause
+                values.append(primary_key_value)
+            else:
+                # Insert new record
+                placeholders = ", ".join(["?" for _ in col_names])
+                col_list = ", ".join(col_names)
+                query = f"INSERT INTO {table_name} ({col_list}) VALUES ({placeholders})"
+            
+            # Execute query
+            self.cursor.execute(query, values)
+            self.connection.commit()
+            
+            # Refresh table data
+            self.load_table_data()
+            self.update_dashboard_stats()
+            
+            dialog.destroy()
+            self.table_action_status.config(text="✅ Record saved successfully")
+            
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to save record:\n{str(e)}")
+    
+    def delete_record(self):
+        if not self.selected_row:
+            messagebox.showwarning("Warning", "Please select a record to delete.")
+            return
+        
+        table_name = self.table_var.get()
+        if not table_name:
+            messagebox.showwarning("Warning", "Please select a table first.")
+            return
+        
+        # Get primary key column
+        self.cursor.execute(f"PRAGMA table_info({table_name})")
+        columns = self.cursor.fetchall()
+        primary_key_col = None
+        
+        for col in columns:
+            if col[5]:  # pk field
+                primary_key_col = col[1]
+                break
+        
+        if not primary_key_col:
+            messagebox.showerror("Error", "Cannot delete record - no primary key found.")
+            return
+        
+        # Find primary key value
+        pk_index = None
+        for i, col in enumerate(columns):
+            if col[1] == primary_key_col:
+                pk_index = i
+                break
+        
+        if pk_index is None or pk_index >= len(self.selected_row):
+            messagebox.showerror("Error", "Cannot delete record - primary key value not found.")
+            return
+        
+        pk_value = self.selected_row[pk_index]
+        
+        # Confirm deletion
+        if not messagebox.askyesno("Confirm Deletion", 
+                                  f"Are you sure you want to delete this record?\n\n{primary_key_col}: {pk_value}"):
+            return
+        
+        try:
+            # Delete record
+            query = f"DELETE FROM {table_name} WHERE {primary_key_col} = ?"
+            self.cursor.execute(query, (pk_value,))
+            self.connection.commit()
+            
+            # Refresh table data
+            self.load_table_data()
+            self.update_dashboard_stats()
+            
+            self.table_action_status.config(text="✅ Record deleted successfully")
+            
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to delete record:\n{str(e)}")
+    
     def update_dashboard_stats(self):
         if not self.cursor:
             return
@@ -762,6 +1266,8 @@ class DentalClinicApp:
         if not table_name:
             messagebox.showwarning("Warning", "Please select a table first.")
             return
+        
+        self.current_table = table_name
         
         try:
             # Clear existing treeview
