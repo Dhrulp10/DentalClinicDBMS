@@ -4,23 +4,438 @@ import sqlite3
 import os
 from datetime import datetime
 
-class DentalClinicApp:
+class LoginWindow:
     def __init__(self, root):
+        self.root = root
+        self.root.title("Dental Clinic - Database Connection")
+        self.root.geometry("500x400")
+        self.root.configure(bg='#f5f5f5')
+        
+        # Center the window
+        self.center_window()
+        
+        self.db_file = "dental_clinic.db"
+        self.connection = None
+        self.cursor = None
+        
+        self.setup_login_ui()
+    
+    def center_window(self):
+        self.root.update_idletasks()
+        width = self.root.winfo_width()
+        height = self.root.winfo_height()
+        x = (self.root.winfo_screenwidth() // 2) - (width // 2)
+        y = (self.root.winfo_screenheight() // 2) - (height // 2)
+        self.root.geometry(f'{width}x{height}+{x}+{y}')
+    
+    def setup_login_ui(self):
+        # Main container
+        main_frame = ttk.Frame(self.root, padding=40)
+        main_frame.pack(expand=True, fill=tk.BOTH)
+        
+        # Title
+        title_label = ttk.Label(main_frame, text="🦷 Dental Clinic Management", 
+                               font=('Arial', 18, 'bold'), foreground='#2c3e50')
+        title_label.pack(pady=(0, 5))
+        
+        subtitle_label = ttk.Label(main_frame, text="Database Connection", 
+                                  font=('Arial', 12), foreground='#7f8c8d')
+        subtitle_label.pack(pady=(0, 30))
+        
+        # Login form frame
+        form_frame = ttk.Frame(main_frame)
+        form_frame.pack(pady=20)
+        
+        # Username
+        ttk.Label(form_frame, text="Username:", font=('Arial', 10)).grid(row=0, column=0, sticky='w', pady=10)
+        self.username_entry = ttk.Entry(form_frame, width=30, font=('Arial', 10))
+        self.username_entry.grid(row=0, column=1, pady=10, padx=(10, 0))
+        self.username_entry.insert(0, "admin")  # Default username
+        
+        # Password
+        ttk.Label(form_frame, text="Password:", font=('Arial', 10)).grid(row=1, column=0, sticky='w', pady=10)
+        self.password_entry = ttk.Entry(form_frame, width=30, show="*", font=('Arial', 10))
+        self.password_entry.grid(row=1, column=1, pady=10, padx=(10, 0))
+        self.password_entry.insert(0, "admin")  # Default password
+        
+        # Database file info
+        ttk.Label(form_frame, text="Database:", font=('Arial', 10)).grid(row=2, column=0, sticky='w', pady=10)
+        db_label = ttk.Label(form_frame, text=self.db_file, font=('Arial', 10), foreground='#27ae60')
+        db_label.grid(row=2, column=1, sticky='w', pady=10, padx=(10, 0))
+        
+        # Buttons frame
+        button_frame = ttk.Frame(main_frame)
+        button_frame.pack(pady=20)
+        
+        # Test Connection button
+        test_btn = ttk.Button(button_frame, text="Test Connection", 
+                             command=self.test_connection, width=20)
+        test_btn.pack(side=tk.LEFT, padx=5)
+        
+        # Connect button
+        connect_btn = ttk.Button(button_frame, text="Connect & Login", 
+                                command=self.connect_and_login, width=20)
+        connect_btn.pack(side=tk.LEFT, padx=5)
+        
+        # Status label
+        self.status_label = ttk.Label(main_frame, text="", font=('Arial', 10))
+        self.status_label.pack(pady=10)
+        
+        # Info text
+        info_text = "Note: This is a SQLite database connection.\nDefault credentials: admin/admin"
+        info_label = ttk.Label(main_frame, text=info_text, font=('Arial', 9), 
+                              foreground='#7f8c8d', justify=tk.CENTER)
+        info_label.pack(pady=20)
+        
+        # Bind Enter key to login
+        self.root.bind('<Return>', lambda e: self.connect_and_login())
+    
+    def test_connection(self):
+        username = self.username_entry.get()
+        password = self.password_entry.get()
+        
+        if not username or not password:
+            self.status_label.config(text="❌ Please enter username and password", foreground='#e74c3c')
+            return
+        
+        # Simple authentication (in real app, this would be more secure)
+        if username != "admin" or password != "admin":
+            self.status_label.config(text="❌ Invalid credentials", foreground='#e74c3c')
+            return
+        
+        try:
+            # Test database connection
+            test_conn = sqlite3.connect(self.db_file)
+            test_cursor = test_conn.cursor()
+            test_cursor.execute("SELECT 1")
+            test_conn.close()
+            
+            self.status_label.config(text="✅ Connection successful! Click 'Connect & Login' to proceed.", 
+                                   foreground='#27ae60')
+            messagebox.showinfo("Connection Test", "✅ Database connection successful!\n\nYou can now login to the system.")
+        except Exception as e:
+            self.status_label.config(text=f"❌ Connection failed: {str(e)}", foreground='#e74c3c')
+            messagebox.showerror("Connection Error", f"Failed to connect to database:\n{str(e)}")
+    
+    def connect_and_login(self):
+        username = self.username_entry.get()
+        password = self.password_entry.get()
+        
+        if not username or not password:
+            self.status_label.config(text="❌ Please enter username and password", foreground='#e74c3c')
+            return
+        
+        # Simple authentication
+        if username != "admin" or password != "admin":
+            self.status_label.config(text="❌ Invalid credentials", foreground='#e74c3c')
+            messagebox.showerror("Login Failed", "Invalid username or password")
+            return
+        
+        try:
+            # Connect to database
+            self.connection = sqlite3.connect(self.db_file)
+            self.cursor = self.connection.cursor()
+            
+            # Create tables if they don't exist
+            self.create_tables()
+            self.populate_tables()
+            
+            self.status_label.config(text="✅ Logged in successfully! Opening application...", 
+                                   foreground='#27ae60')
+            
+            # Close login window and open main application
+            self.root.after(500, self.open_main_application)
+            
+        except Exception as e:
+            self.status_label.config(text=f"❌ Login failed: {str(e)}", foreground='#e74c3c')
+            messagebox.showerror("Login Error", f"Failed to login:\n{str(e)}")
+    
+    def open_main_application(self):
+        # Close login window
+        self.root.destroy()
+        
+        # Open main application window
+        main_root = tk.Tk()
+        app = DentalClinicApp(main_root, self.connection, self.cursor)
+        main_root.mainloop()
+    
+    def create_tables(self):
+        tables_sql = [
+            """
+            CREATE TABLE IF NOT EXISTS Patient (
+                patient_id INTEGER PRIMARY KEY,
+                full_name TEXT NOT NULL,
+                date_of_birth TEXT,
+                street TEXT,
+                city TEXT,
+                province TEXT,
+                postal_code TEXT,
+                gender TEXT,
+                phone TEXT,
+                email TEXT UNIQUE,
+                medical_history TEXT,
+                insurance TEXT
+            )
+            """,
+            """
+            CREATE TABLE IF NOT EXISTS Room (
+                room_number INTEGER PRIMARY KEY,
+                room_type TEXT,
+                capacity INTEGER DEFAULT 0,
+                availability TEXT DEFAULT 'Y' CHECK (availability IN ('Y', 'N'))
+            )
+            """,
+            """
+            CREATE TABLE IF NOT EXISTS Staff (
+                staff_id INTEGER PRIMARY KEY,
+                name TEXT NOT NULL,
+                phone TEXT,
+                email TEXT,
+                salary REAL
+            )
+            """,
+            """
+            CREATE TABLE IF NOT EXISTS Staff_Schedule (
+                schedule_id INTEGER PRIMARY KEY,
+                staff_id INTEGER NOT NULL,
+                start_time TEXT NOT NULL,
+                end_time TEXT NOT NULL,
+                FOREIGN KEY (staff_id) REFERENCES Staff(staff_id)
+            )
+            """,
+            """
+            CREATE TABLE IF NOT EXISTS Dentist (
+                staff_id INTEGER PRIMARY KEY,
+                license_no TEXT,
+                specialization TEXT,
+                FOREIGN KEY (staff_id) REFERENCES Staff(staff_id)
+            )
+            """,
+            """
+            CREATE TABLE IF NOT EXISTS Dental_Assistant (
+                staff_id INTEGER PRIMARY KEY,
+                certification TEXT,
+                FOREIGN KEY (staff_id) REFERENCES Staff(staff_id)
+            )
+            """,
+            """
+            CREATE TABLE IF NOT EXISTS Receptionist (
+                staff_id INTEGER PRIMARY KEY,
+                FOREIGN KEY (staff_id) REFERENCES Staff(staff_id)
+            )
+            """,
+            """
+            CREATE TABLE IF NOT EXISTS Appointment (
+                appointment_id INTEGER PRIMARY KEY,
+                patient_id INTEGER NOT NULL,
+                room_number INTEGER NOT NULL,
+                appointment_datetime TEXT NOT NULL,
+                status TEXT DEFAULT 'SCHEDULED' CHECK (status IN ('SCHEDULED', 'COMPLETED', 'CANCELLED')),
+                FOREIGN KEY (patient_id) REFERENCES Patient(patient_id),
+                FOREIGN KEY (room_number) REFERENCES Room(room_number)
+            )
+            """,
+            """
+            CREATE TABLE IF NOT EXISTS Appointment_Staff (
+                appointment_id INTEGER NOT NULL,
+                staff_id INTEGER NOT NULL,
+                PRIMARY KEY (appointment_id, staff_id),
+                FOREIGN KEY (appointment_id) REFERENCES Appointment(appointment_id),
+                FOREIGN KEY (staff_id) REFERENCES Staff(staff_id)
+            )
+            """,
+            """
+            CREATE TABLE IF NOT EXISTS Dental_Action (
+                dental_action_id INTEGER PRIMARY KEY,
+                appointment_id INTEGER NOT NULL,
+                cost REAL,
+                FOREIGN KEY (appointment_id) REFERENCES Appointment(appointment_id)
+            )
+            """,
+            """
+            CREATE TABLE IF NOT EXISTS Treatment (
+                treatment_id INTEGER PRIMARY KEY,
+                dental_action_id INTEGER NOT NULL,
+                description TEXT,
+                type TEXT,
+                FOREIGN KEY (dental_action_id) REFERENCES Dental_Action(dental_action_id)
+            )
+            """,
+            """
+            CREATE TABLE IF NOT EXISTS Prescription (
+                prescription_id INTEGER PRIMARY KEY,
+                dental_action_id INTEGER NOT NULL,
+                medication TEXT NOT NULL,
+                dosage TEXT,
+                duration TEXT,
+                FOREIGN KEY (dental_action_id) REFERENCES Dental_Action(dental_action_id)
+            )
+            """,
+            """
+            CREATE TABLE IF NOT EXISTS Inventory (
+                item_id INTEGER PRIMARY KEY,
+                item_name TEXT NOT NULL,
+                quantity INTEGER NOT NULL,
+                supplier TEXT
+            )
+            """,
+            """
+            CREATE TABLE IF NOT EXISTS DentalAction_Inventory (
+                dental_action_id INTEGER NOT NULL,
+                item_id INTEGER NOT NULL,
+                quantity_used INTEGER NOT NULL,
+                PRIMARY KEY (dental_action_id, item_id),
+                FOREIGN KEY (dental_action_id) REFERENCES Dental_Action(dental_action_id),
+                FOREIGN KEY (item_id) REFERENCES Inventory(item_id)
+            )
+            """,
+            """
+            CREATE TABLE IF NOT EXISTS Bill (
+                bill_id INTEGER PRIMARY KEY,
+                dental_action_id INTEGER NOT NULL,
+                total_amount REAL,
+                status TEXT DEFAULT 'UNPAID' CHECK (status IN ('UNPAID', 'PARTIALLY_PAID', 'PAID')),
+                issue_date TEXT,
+                FOREIGN KEY (dental_action_id) REFERENCES Dental_Action(dental_action_id)
+            )
+            """
+        ]
+        
+        for sql in tables_sql:
+            self.cursor.execute(sql)
+        
+        self.connection.commit()
+    
+    def populate_tables(self):
+        # Check if data already exists
+        self.cursor.execute("SELECT COUNT(*) FROM Patient")
+        if self.cursor.fetchone()[0] > 0:
+            return  # Data already populated
+        
+        sample_data = [
+            # Patients
+            "INSERT INTO Patient VALUES (1, 'John Doe', '2000-01-01', '123 Main St', 'Toronto', 'ON', 'M5V1E3', 'Male', '647-123-1234', 'john.doe@email.com', 'No allergies', 'SunLife')",
+            "INSERT INTO Patient VALUES (2, 'Jane Smith', '1995-05-15', '456 Oak Ave', 'Toronto', 'ON', 'M5V2B2', 'Female', '416-555-1234', 'jane.smith@email.com', 'Asthma', 'Manulife')",
+            "INSERT INTO Patient VALUES (3, 'Bob Johnson', '1988-11-20', '789 Pine Rd', 'Mississauga', 'ON', 'L5A3K2', 'Male', '905-444-5678', 'bob.johnson@email.com', 'Diabetes', 'BlueCross')",
+            "INSERT INTO Patient VALUES (4, 'Alice Williams', '1992-03-10', '321 Elm St', 'Toronto', 'ON', 'M4C2N1', 'Female', '647-777-8888', 'alice.w@email.com', 'None', 'SunLife')",
+            
+            # Rooms
+            "INSERT INTO Room VALUES (100, 'Surgery', 1, 'Y')",
+            "INSERT INTO Room VALUES (101, 'Consultation', 1, 'Y')",
+            "INSERT INTO Room VALUES (102, 'X-Ray', 1, 'N')",
+            "INSERT INTO Room VALUES (103, 'Cleaning', 1, 'Y')",
+            
+            # Staff
+            "INSERT INTO Staff VALUES (1, 'Dr. Sarah Johnson', '416-111-2222', 'sjohnson@dental.com', 120000.00)",
+            "INSERT INTO Staff VALUES (2, 'Dr. Michael Chen', '416-222-3333', 'mchen@dental.com', 125000.00)",
+            "INSERT INTO Staff VALUES (3, 'Emily Brown', '416-333-4444', 'ebrown@dental.com', 45000.00)",
+            "INSERT INTO Staff VALUES (4, 'David Lee', '416-444-5555', 'dlee@dental.com', 42000.00)",
+            "INSERT INTO Staff VALUES (5, 'Jessica Martinez', '416-555-6666', 'jmartinez@dental.com', 38000.00)",
+            
+            # Dentists
+            "INSERT INTO Dentist VALUES (1, 'DEN-2018-0123', 'Orthodontics')",
+            "INSERT INTO Dentist VALUES (2, 'DEN-2019-0456', 'Endodontics')",
+            
+            # Dental Assistants
+            "INSERT INTO Dental_Assistant VALUES (3, 'Certified Dental Assistant Level II')",
+            "INSERT INTO Dental_Assistant VALUES (4, 'Certified Dental Assistant Level I')",
+            
+            # Receptionists
+            "INSERT INTO Receptionist VALUES (5)",
+            
+            # Staff Schedules
+            "INSERT INTO Staff_Schedule VALUES (1, 1, '2024-01-15 08:00:00', '2024-01-15 16:00:00')",
+            "INSERT INTO Staff_Schedule VALUES (2, 2, '2024-01-15 09:00:00', '2024-01-15 17:00:00')",
+            "INSERT INTO Staff_Schedule VALUES (3, 3, '2024-01-15 08:00:00', '2024-01-15 16:00:00')",
+            "INSERT INTO Staff_Schedule VALUES (4, 4, '2024-01-16 08:00:00', '2024-01-16 16:00:00')",
+            "INSERT INTO Staff_Schedule VALUES (5, 5, '2024-01-15 07:30:00', '2024-01-15 15:30:00')",
+            
+            # Appointments
+            "INSERT INTO Appointment VALUES (1000, 1, 100, '2024-01-15 09:30:00', 'COMPLETED')",
+            "INSERT INTO Appointment VALUES (1001, 2, 101, '2024-01-16 10:00:00', 'SCHEDULED')",
+            "INSERT INTO Appointment VALUES (1002, 3, 100, '2024-01-17 14:00:00', 'COMPLETED')",
+            "INSERT INTO Appointment VALUES (1003, 4, 103, '2024-01-18 11:00:00', 'COMPLETED')",
+            "INSERT INTO Appointment VALUES (1004, 1, 101, '2024-01-19 15:00:00', 'SCHEDULED')",
+            
+            # Appointment_Staff
+            "INSERT INTO Appointment_Staff VALUES (1000, 1)",
+            "INSERT INTO Appointment_Staff VALUES (1000, 3)",
+            "INSERT INTO Appointment_Staff VALUES (1001, 2)",
+            "INSERT INTO Appointment_Staff VALUES (1001, 4)",
+            "INSERT INTO Appointment_Staff VALUES (1002, 1)",
+            "INSERT INTO Appointment_Staff VALUES (1002, 3)",
+            "INSERT INTO Appointment_Staff VALUES (1003, 2)",
+            
+            # Dental Actions
+            "INSERT INTO Dental_Action VALUES (400, 1000, 150.00)",
+            "INSERT INTO Dental_Action VALUES (401, 1001, 200.00)",
+            "INSERT INTO Dental_Action VALUES (402, 1002, 500.00)",
+            "INSERT INTO Dental_Action VALUES (403, 1003, 75.00)",
+            "INSERT INTO Dental_Action VALUES (404, 1000, 100.00)",
+            
+            # Treatments
+            "INSERT INTO Treatment VALUES (500, 400, 'Teeth Cleaning', 'Hygiene')",
+            "INSERT INTO Treatment VALUES (501, 401, 'Root Canal', 'Surgery')",
+            "INSERT INTO Treatment VALUES (502, 402, 'Tooth Extraction', 'Surgery')",
+            "INSERT INTO Treatment VALUES (503, 403, 'Dental Checkup', 'Examination')",
+            "INSERT INTO Treatment VALUES (504, 404, 'Fluoride Treatment', 'Hygiene')",
+            
+            # Prescriptions
+            "INSERT INTO Prescription VALUES (1, 401, 'Amoxicillin', '500mg', '7 days')",
+            "INSERT INTO Prescription VALUES (2, 402, 'Ibuprofen', '400mg', '5 days')",
+            "INSERT INTO Prescription VALUES (3, 401, 'Hydrocodone', '5mg', '3 days')",
+            
+            # Inventory
+            "INSERT INTO Inventory VALUES (1, 'Dental Gloves', 500, 'MedSupply Inc')",
+            "INSERT INTO Inventory VALUES (2, 'Anesthetic Cartridges', 200, 'DentalPro')",
+            "INSERT INTO Inventory VALUES (3, 'Dental Floss', 300, 'OralCare Co')",
+            "INSERT INTO Inventory VALUES (4, 'Surgical Masks', 1000, 'SafetyFirst')",
+            "INSERT INTO Inventory VALUES (5, 'Fluoride Gel', 50, 'DentalPro')",
+            
+            # DentalAction_Inventory
+            "INSERT INTO DentalAction_Inventory VALUES (400, 1, 2)",
+            "INSERT INTO DentalAction_Inventory VALUES (400, 3, 1)",
+            "INSERT INTO DentalAction_Inventory VALUES (401, 1, 2)",
+            "INSERT INTO DentalAction_Inventory VALUES (401, 2, 3)",
+            "INSERT INTO DentalAction_Inventory VALUES (402, 1, 2)",
+            "INSERT INTO DentalAction_Inventory VALUES (402, 2, 5)",
+            "INSERT INTO DentalAction_Inventory VALUES (404, 5, 1)",
+            
+            # Bills
+            "INSERT INTO Bill VALUES (800, 400, 150.00, 'PAID', '2024-01-15')",
+            "INSERT INTO Bill VALUES (801, 401, 200.00, 'UNPAID', '2024-01-16')",
+            "INSERT INTO Bill VALUES (802, 402, 500.00, 'PARTIALLY_PAID', '2024-01-17')",
+            "INSERT INTO Bill VALUES (803, 403, 75.00, 'PAID', '2024-01-18')"
+        ]
+        
+        try:
+            for sql in sample_data:
+                self.cursor.execute(sql)
+            self.connection.commit()
+        except Exception as e:
+            self.connection.rollback()
+            print(f"Error populating tables: {str(e)}")
+            raise
+
+
+class DentalClinicApp:
+    def __init__(self, root, connection, cursor):
         self.root = root
         self.root.title("Dental Clinic Management System")
         self.root.geometry("1200x800")
         self.root.configure(bg='#f5f5f5')
         
-        # SQLite database connection
-        self.connection = None
-        self.cursor = None
+        # Use passed connection and cursor
+        self.connection = connection
+        self.cursor = cursor
         self.db_file = "dental_clinic.db"
         
-        # Setup UI first to create widgets
+        # Setup UI
         self.setup_ui()
         
-        # Then connect to database
-        self.connect_to_sqlite()
+        # Update dashboard stats
+        self.root.after(100, self.update_dashboard_stats)
+        self.root.after(100, self.populate_table_list)
     
     def setup_ui(self):
         self.setup_styles()
@@ -62,25 +477,6 @@ class DentalClinicApp:
         style.configure('Warning.TLabel', foreground='#e67e22', font=('Arial', 9))
         style.configure('Custom.TButton', font=('Arial', 10), padding=(10, 5))
     
-    def connect_to_sqlite(self):
-        try:
-            self.connection = sqlite3.connect(self.db_file)
-            self.cursor = self.connection.cursor()
-            self.create_tables()
-            self.populate_tables()
-            print(f"Connected to SQLite database: {self.db_file}")
-            if hasattr(self, 'connection_status'):
-                self.update_connection_status("✅ Connected to database")
-            # Update dashboard stats and table list after connection
-            if hasattr(self, 'patients_count'):
-                self.update_dashboard_stats()
-            if hasattr(self, 'table_combo'):
-                self.populate_table_list()
-        except Exception as e:
-            error_msg = f"Cannot connect to database: {str(e)}"
-            print(error_msg)
-            messagebox.showerror("Database Error", error_msg)
-    
     def setup_dashboard(self):
         # Header
         header_frame = ttk.Frame(self.dashboard_frame)
@@ -93,7 +489,7 @@ class DentalClinicApp:
         subtitle.pack(pady=5)
         
         # Connection status
-        self.connection_status = ttk.Label(header_frame, text="", style='Success.TLabel')
+        self.connection_status = ttk.Label(header_frame, text="✅ Connected to database", style='Success.TLabel')
         self.connection_status.pack()
         
         # Stats cards
@@ -150,9 +546,6 @@ class DentalClinicApp:
             desc_label = ttk.Label(btn_frame, text=description, font=('Arial', 8), foreground='#666', 
                                  wraplength=200, justify=tk.CENTER)
             desc_label.pack(fill=tk.X, pady=(2, 0))
-        
-        # Update stats
-        self.update_dashboard_stats()
     
     def setup_query_frame(self):
         # Query selection section
@@ -273,14 +666,28 @@ class DentalClinicApp:
         tree_frame.grid_columnconfigure(0, weight=1)
     
     def setup_schema_frame(self):
-        schema_text = scrolledtext.ScrolledText(self.schema_frame, wrap=tk.WORD, 
-                                               font=('Consolas', 10), width=100, height=30)
-        schema_text.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
+        # Header with refresh button
+        header_frame = ttk.Frame(self.schema_frame)
+        header_frame.pack(fill=tk.X, padx=10, pady=10)
+        
+        ttk.Label(header_frame, text="Database Schema", font=('Arial', 14, 'bold')).pack(side=tk.LEFT)
+        ttk.Button(header_frame, text="Refresh Schema", command=self.refresh_schema, 
+                  style='Custom.TButton').pack(side=tk.RIGHT)
+        
+        # Schema text widget
+        self.schema_text = scrolledtext.ScrolledText(self.schema_frame, wrap=tk.WORD, 
+                                                     font=('Consolas', 10), width=100, height=30)
+        self.schema_text.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
         
         # Load schema information
+        self.refresh_schema()
+    
+    def refresh_schema(self):
+        self.schema_text.config(state=tk.NORMAL)
+        self.schema_text.delete(1.0, tk.END)
         schema_info = self.get_schema_info()
-        schema_text.insert(tk.END, schema_info)
-        schema_text.config(state=tk.DISABLED)
+        self.schema_text.insert(tk.END, schema_info)
+        self.schema_text.config(state=tk.DISABLED)
     
     def setup_sql_frame(self):
         # SQL input section
@@ -593,30 +1000,42 @@ class DentalClinicApp:
             return "Database not connected"
             
         try:
-            schema_info = "DATABASE SCHEMA - DENTAL CLINIC MANAGEMENT SYSTEM\n"
-            schema_info += "=" * 60 + "\n\n"
+            schema_info = "=" * 80 + "\n"
+            schema_info += "DATABASE SCHEMA - DENTAL CLINIC MANAGEMENT SYSTEM\n"
+            schema_info += "=" * 80 + "\n\n"
             
             self.cursor.execute("SELECT name FROM sqlite_master WHERE type='table' ORDER BY name")
             tables = self.cursor.fetchall()
             
+            schema_info += f"Total Tables: {len(tables)}\n\n"
+            
             for table in tables:
                 table_name = table[0]
                 schema_info += f"TABLE: {table_name}\n"
-                schema_info += "-" * 40 + "\n"
+                schema_info += "-" * 80 + "\n"
                 
                 self.cursor.execute(f"PRAGMA table_info({table_name})")
                 columns = self.cursor.fetchall()
                 
+                schema_info += f"{'Column Name':<25} {'Type':<15} {'Constraints':<20}\n"
+                schema_info += "-" * 80 + "\n"
+                
                 for col in columns:
                     col_name, col_type, not_null, default_val, pk = col[1], col[2], col[3], col[4], col[5]
-                    schema_info += f"  {col_name:<20} {col_type:<15}"
+                    constraints = []
                     if pk:
-                        schema_info += " PRIMARY KEY"
+                        constraints.append("PRIMARY KEY")
                     if not_null:
-                        schema_info += " NOT NULL"
-                    schema_info += "\n"
+                        constraints.append("NOT NULL")
+                    
+                    constraint_str = ", ".join(constraints) if constraints else ""
+                    schema_info += f"{col_name:<25} {col_type:<15} {constraint_str:<20}\n"
                 
-                schema_info += "\n"
+                # Get row count
+                self.cursor.execute(f"SELECT COUNT(*) FROM {table_name}")
+                row_count = self.cursor.fetchone()[0]
+                schema_info += f"\nTotal Rows: {row_count}\n"
+                schema_info += "\n\n"
             
             return schema_info
         except Exception as e:
@@ -633,280 +1052,32 @@ class DentalClinicApp:
         try:
             self.cursor.execute("SELECT 1")
             messagebox.showinfo("Connection Test", "✅ Database connection is working properly!")
-            self.update_connection_status("✅ Database connected")
+            self.connection_status.config(text="✅ Database connected")
         except Exception as e:
             messagebox.showerror("Connection Test", f"❌ Connection failed: {str(e)}")
-            self.update_connection_status("❌ Connection failed")
+            self.connection_status.config(text="❌ Connection failed")
     
     def reset_database(self):
         if messagebox.askyesno("Confirm Reset", "This will drop all tables and recreate them with sample data.\n\nAre you sure?"):
-            self.drop_tables()
-            self.create_tables()
-            self.populate_tables()
-            self.update_dashboard_stats()
-            self.populate_table_list()
-            messagebox.showinfo("Success", "Database has been reset successfully!")
+            try:
+                self.drop_tables()
+                
+                # Re-create tables using LoginWindow methods
+                login = LoginWindow(tk.Tk())
+                login.cursor = self.cursor
+                login.connection = self.connection
+                login.create_tables()
+                login.populate_tables()
+                
+                self.update_dashboard_stats()
+                self.populate_table_list()
+                self.refresh_schema()
+                messagebox.showinfo("Success", "Database has been reset successfully!")
+            except Exception as e:
+                messagebox.showerror("Error", f"Failed to reset database: {str(e)}")
     
     def update_connection_status(self, message):
         self.connection_status.config(text=message)
-    
-    def create_tables(self):
-        tables_sql = [
-            """
-            CREATE TABLE IF NOT EXISTS Patient (
-                patient_id INTEGER PRIMARY KEY,
-                full_name TEXT NOT NULL,
-                date_of_birth TEXT,
-                street TEXT,
-                city TEXT,
-                province TEXT,
-                postal_code TEXT,
-                gender TEXT,
-                phone TEXT,
-                email TEXT UNIQUE,
-                medical_history TEXT,
-                insurance TEXT
-            )
-            """,
-            """
-            CREATE TABLE IF NOT EXISTS Room (
-                room_number INTEGER PRIMARY KEY,
-                room_type TEXT,
-                capacity INTEGER DEFAULT 0,
-                availability TEXT DEFAULT 'Y' CHECK (availability IN ('Y', 'N'))
-            )
-            """,
-            """
-            CREATE TABLE IF NOT EXISTS Appointment (
-                appointment_id INTEGER PRIMARY KEY,
-                patient_id INTEGER NOT NULL,
-                room_number INTEGER NOT NULL,
-                appointment_datetime TEXT NOT NULL,
-                status TEXT DEFAULT 'SCHEDULED' CHECK (status IN ('SCHEDULED', 'COMPLETED', 'CANCELLED')),
-                FOREIGN KEY (patient_id) REFERENCES Patient(patient_id),
-                FOREIGN KEY (room_number) REFERENCES Room(room_number)
-            )
-            """,
-            """
-            CREATE TABLE IF NOT EXISTS Staff (
-                staff_id INTEGER PRIMARY KEY,
-                name TEXT NOT NULL,
-                phone TEXT,
-                email TEXT,
-                salary REAL
-            )
-            """,
-            """
-            CREATE TABLE IF NOT EXISTS Staff_Schedule (
-                schedule_id INTEGER PRIMARY KEY,
-                staff_id INTEGER NOT NULL,
-                start_time TEXT NOT NULL,
-                end_time TEXT NOT NULL,
-                FOREIGN KEY (staff_id) REFERENCES Staff(staff_id)
-            )
-            """,
-            """
-            CREATE TABLE IF NOT EXISTS Dentist (
-                staff_id INTEGER PRIMARY KEY,
-                license_no TEXT,
-                specialization TEXT,
-                FOREIGN KEY (staff_id) REFERENCES Staff(staff_id)
-            )
-            """,
-            """
-            CREATE TABLE IF NOT EXISTS Dental_Assistant (
-                staff_id INTEGER PRIMARY KEY,
-                certification TEXT,
-                FOREIGN KEY (staff_id) REFERENCES Staff(staff_id)
-            )
-            """,
-            """
-            CREATE TABLE IF NOT EXISTS Receptionist (
-                staff_id INTEGER PRIMARY KEY,
-                FOREIGN KEY (staff_id) REFERENCES Staff(staff_id)
-            )
-            """,
-            """
-            CREATE TABLE IF NOT EXISTS Appointment_Staff (
-                appointment_id INTEGER NOT NULL,
-                staff_id INTEGER NOT NULL,
-                PRIMARY KEY (appointment_id, staff_id),
-                FOREIGN KEY (appointment_id) REFERENCES Appointment(appointment_id),
-                FOREIGN KEY (staff_id) REFERENCES Staff(staff_id)
-            )
-            """,
-            """
-            CREATE TABLE IF NOT EXISTS Dental_Action (
-                dental_action_id INTEGER PRIMARY KEY,
-                appointment_id INTEGER NOT NULL,
-                cost REAL,
-                FOREIGN KEY (appointment_id) REFERENCES Appointment(appointment_id)
-            )
-            """,
-            """
-            CREATE TABLE IF NOT EXISTS Treatment (
-                treatment_id INTEGER PRIMARY KEY,
-                dental_action_id INTEGER NOT NULL,
-                description TEXT,
-                type TEXT,
-                FOREIGN KEY (dental_action_id) REFERENCES Dental_Action(dental_action_id)
-            )
-            """,
-            """
-            CREATE TABLE IF NOT EXISTS Prescription (
-                prescription_id INTEGER PRIMARY KEY,
-                dental_action_id INTEGER NOT NULL,
-                medication TEXT NOT NULL,
-                dosage TEXT,
-                duration TEXT,
-                FOREIGN KEY (dental_action_id) REFERENCES Dental_Action(dental_action_id)
-            )
-            """,
-            """
-            CREATE TABLE IF NOT EXISTS Inventory (
-                item_id INTEGER PRIMARY KEY,
-                item_name TEXT NOT NULL,
-                quantity INTEGER NOT NULL,
-                supplier TEXT
-            )
-            """,
-            """
-            CREATE TABLE IF NOT EXISTS DentalAction_Inventory (
-                dental_action_id INTEGER NOT NULL,
-                item_id INTEGER NOT NULL,
-                quantity_used INTEGER NOT NULL,
-                PRIMARY KEY (dental_action_id, item_id),
-                FOREIGN KEY (dental_action_id) REFERENCES Dental_Action(dental_action_id),
-                FOREIGN KEY (item_id) REFERENCES Inventory(item_id)
-            )
-            """,
-            """
-            CREATE TABLE IF NOT EXISTS Bill (
-                bill_id INTEGER PRIMARY KEY,
-                dental_action_id INTEGER NOT NULL,
-                total_amount REAL,
-                status TEXT DEFAULT 'UNPAID' CHECK (status IN ('UNPAID', 'PARTIALLY_PAID', 'PAID')),
-                issue_date TEXT,
-                FOREIGN KEY (dental_action_id) REFERENCES Dental_Action(dental_action_id)
-            )
-            """
-        ]
-        
-        for sql in tables_sql:
-            self.cursor.execute(sql)
-        
-        self.connection.commit()
-    
-    def populate_tables(self):
-        # Check if data already exists
-        self.cursor.execute("SELECT COUNT(*) FROM Patient")
-        if self.cursor.fetchone()[0] > 0:
-            return  # Data already populated
-        
-        sample_data = [
-            # Patients
-            "INSERT INTO Patient VALUES (1, 'John Doe', '2000-01-01', '123 Main St', 'Toronto', 'ON', 'M5V1E3', 'Male', '647-123-1234', 'john.doe@email.com', 'No allergies', 'SunLife')",
-            "INSERT INTO Patient VALUES (2, 'Jane Smith', '1995-05-15', '456 Oak Ave', 'Toronto', 'ON', 'M5V2B2', 'Female', '416-555-1234', 'jane.smith@email.com', 'Asthma', 'Manulife')",
-            "INSERT INTO Patient VALUES (3, 'Bob Johnson', '1988-11-20', '789 Pine Rd', 'Mississauga', 'ON', 'L5A3K2', 'Male', '905-444-5678', 'bob.johnson@email.com', 'Diabetes', 'BlueCross')",
-            "INSERT INTO Patient VALUES (4, 'Alice Williams', '1992-03-10', '321 Elm St', 'Toronto', 'ON', 'M4C2N1', 'Female', '647-777-8888', 'alice.w@email.com', 'None', 'SunLife')",
-            
-            # Rooms
-            "INSERT INTO Room VALUES (100, 'Surgery', 1, 'Y')",
-            "INSERT INTO Room VALUES (101, 'Consultation', 1, 'Y')",
-            "INSERT INTO Room VALUES (102, 'X-Ray', 1, 'N')",
-            "INSERT INTO Room VALUES (103, 'Cleaning', 1, 'Y')",
-            
-            # Staff
-            "INSERT INTO Staff VALUES (1, 'Dr. Sarah Johnson', '416-111-2222', 'sjohnson@dental.com', 120000.00)",
-            "INSERT INTO Staff VALUES (2, 'Dr. Michael Chen', '416-222-3333', 'mchen@dental.com', 125000.00)",
-            "INSERT INTO Staff VALUES (3, 'Emily Brown', '416-333-4444', 'ebrown@dental.com', 45000.00)",
-            "INSERT INTO Staff VALUES (4, 'David Lee', '416-444-5555', 'dlee@dental.com', 42000.00)",
-            "INSERT INTO Staff VALUES (5, 'Jessica Martinez', '416-555-6666', 'jmartinez@dental.com', 38000.00)",
-            
-            # Dentists
-            "INSERT INTO Dentist VALUES (1, 'DEN-2018-0123', 'Orthodontics')",
-            "INSERT INTO Dentist VALUES (2, 'DEN-2019-0456', 'Endodontics')",
-            
-            # Dental Assistants
-            "INSERT INTO Dental_Assistant VALUES (3, 'Certified Dental Assistant Level II')",
-            "INSERT INTO Dental_Assistant VALUES (4, 'Certified Dental Assistant Level I')",
-            
-            # Receptionists
-            "INSERT INTO Receptionist VALUES (5)",
-            
-            # Staff Schedules
-            "INSERT INTO Staff_Schedule VALUES (1, 1, '2024-01-15 08:00:00', '2024-01-15 16:00:00')",
-            "INSERT INTO Staff_Schedule VALUES (2, 2, '2024-01-15 09:00:00', '2024-01-15 17:00:00')",
-            "INSERT INTO Staff_Schedule VALUES (3, 3, '2024-01-15 08:00:00', '2024-01-15 16:00:00')",
-            "INSERT INTO Staff_Schedule VALUES (4, 4, '2024-01-16 08:00:00', '2024-01-16 16:00:00')",
-            "INSERT INTO Staff_Schedule VALUES (5, 5, '2024-01-15 07:30:00', '2024-01-15 15:30:00')",
-            
-            # Appointments
-            "INSERT INTO Appointment VALUES (1000, 1, 100, '2024-01-15 09:30:00', 'COMPLETED')",
-            "INSERT INTO Appointment VALUES (1001, 2, 101, '2024-01-16 10:00:00', 'SCHEDULED')",
-            "INSERT INTO Appointment VALUES (1002, 3, 100, '2024-01-17 14:00:00', 'COMPLETED')",
-            "INSERT INTO Appointment VALUES (1003, 4, 103, '2024-01-18 11:00:00', 'COMPLETED')",
-            "INSERT INTO Appointment VALUES (1004, 1, 101, '2024-01-19 15:00:00', 'SCHEDULED')",
-            
-            # Appointment_Staff (linking appointments with staff)
-            "INSERT INTO Appointment_Staff VALUES (1000, 1)",
-            "INSERT INTO Appointment_Staff VALUES (1000, 3)",
-            "INSERT INTO Appointment_Staff VALUES (1001, 2)",
-            "INSERT INTO Appointment_Staff VALUES (1001, 4)",
-            "INSERT INTO Appointment_Staff VALUES (1002, 1)",
-            "INSERT INTO Appointment_Staff VALUES (1002, 3)",
-            "INSERT INTO Appointment_Staff VALUES (1003, 2)",
-            
-            # Dental Actions
-            "INSERT INTO Dental_Action VALUES (400, 1000, 150.00)",
-            "INSERT INTO Dental_Action VALUES (401, 1001, 200.00)",
-            "INSERT INTO Dental_Action VALUES (402, 1002, 500.00)",
-            "INSERT INTO Dental_Action VALUES (403, 1003, 75.00)",
-            "INSERT INTO Dental_Action VALUES (404, 1000, 100.00)",
-            
-            # Treatments
-            "INSERT INTO Treatment VALUES (500, 400, 'Teeth Cleaning', 'Hygiene')",
-            "INSERT INTO Treatment VALUES (501, 401, 'Root Canal', 'Surgery')",
-            "INSERT INTO Treatment VALUES (502, 402, 'Tooth Extraction', 'Surgery')",
-            "INSERT INTO Treatment VALUES (503, 403, 'Dental Checkup', 'Examination')",
-            "INSERT INTO Treatment VALUES (504, 404, 'Fluoride Treatment', 'Hygiene')",
-            
-            # Prescriptions
-            "INSERT INTO Prescription VALUES (1, 401, 'Amoxicillin', '500mg', '7 days')",
-            "INSERT INTO Prescription VALUES (2, 402, 'Ibuprofen', '400mg', '5 days')",
-            "INSERT INTO Prescription VALUES (3, 401, 'Hydrocodone', '5mg', '3 days')",
-            
-            # Inventory
-            "INSERT INTO Inventory VALUES (1, 'Dental Gloves', 500, 'MedSupply Inc')",
-            "INSERT INTO Inventory VALUES (2, 'Anesthetic Cartridges', 200, 'DentalPro')",
-            "INSERT INTO Inventory VALUES (3, 'Dental Floss', 300, 'OralCare Co')",
-            "INSERT INTO Inventory VALUES (4, 'Surgical Masks', 1000, 'SafetyFirst')",
-            "INSERT INTO Inventory VALUES (5, 'Fluoride Gel', 50, 'DentalPro')",
-            
-            # DentalAction_Inventory (items used in procedures)
-            "INSERT INTO DentalAction_Inventory VALUES (400, 1, 2)",
-            "INSERT INTO DentalAction_Inventory VALUES (400, 3, 1)",
-            "INSERT INTO DentalAction_Inventory VALUES (401, 1, 2)",
-            "INSERT INTO DentalAction_Inventory VALUES (401, 2, 3)",
-            "INSERT INTO DentalAction_Inventory VALUES (402, 1, 2)",
-            "INSERT INTO DentalAction_Inventory VALUES (402, 2, 5)",
-            "INSERT INTO DentalAction_Inventory VALUES (404, 5, 1)",
-            
-            # Bills
-            "INSERT INTO Bill VALUES (800, 400, 150.00, 'PAID', '2024-01-15')",
-            "INSERT INTO Bill VALUES (801, 401, 200.00, 'UNPAID', '2024-01-16')",
-            "INSERT INTO Bill VALUES (802, 402, 500.00, 'PARTIALLY_PAID', '2024-01-17')",
-            "INSERT INTO Bill VALUES (803, 403, 75.00, 'PAID', '2024-01-18')"
-        ]
-        
-        try:
-            for sql in sample_data:
-                self.cursor.execute(sql)
-            self.connection.commit()
-        except Exception as e:
-            self.connection.rollback()
-            print(f"Error populating tables: {str(e)}")
-            raise
     
     def drop_tables(self):
         tables = [
@@ -935,7 +1106,7 @@ class DentalClinicApp:
 
 def main():
     root = tk.Tk()
-    app = DentalClinicApp(root)
+    login_app = LoginWindow(root)
     root.mainloop()
 
 
