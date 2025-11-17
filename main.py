@@ -534,7 +534,9 @@ class DentalClinicApp:
         actions_frame.pack(fill=tk.BOTH, expand=True, pady=10)
         
         actions = [
-            ("🗑️ Reset Database", "Drop and recreate all tables with sample data", self.reset_database),
+            ("🗑️ Drop Tables", "Remove all tables from the database", self.drop_tables_only),
+            ("➕ Create Tables", "Create database tables", self.create_tables_only),
+            ("📥 Populate Tables", "Insert sample data into tables", self.insert_sample_data_only),
             ("🔄 Test Connection", "Verify database connectivity", self.test_connection),
             ("📊 View All Tables", "Browse all database tables", lambda: self.notebook.select(2)),
             ("🔍 Run Queries", "Execute analytical queries", lambda: self.notebook.select(1)),
@@ -1257,6 +1259,8 @@ class DentalClinicApp:
             self.table_combo['values'] = tables
             if tables:
                 self.table_var.set(tables[0])
+            else:
+                self.table_var.set("")
         except Exception as e:
             print(f"Error loading tables: {str(e)}")
             messagebox.showerror("Error", f"Failed to load tables: {str(e)}")
@@ -1563,25 +1567,52 @@ class DentalClinicApp:
             messagebox.showerror("Connection Test", f"❌ Connection failed: {str(e)}")
             self.connection_status.config(text="❌ Connection failed")
     
-    def reset_database(self):
-        if messagebox.askyesno("Confirm Reset", "This will drop all tables and recreate them with sample data.\n\nAre you sure?"):
-            try:
-                self.drop_tables()
-                
-                # Re-create tables using LoginWindow methods
-                login = LoginWindow(tk.Tk())
-                login.cursor = self.cursor
-                login.connection = self.connection
-                login.create_tables()
-                login.populate_tables()
-                
-                self.update_dashboard_stats()
-                self.populate_table_list()
-                self.refresh_schema()
-                messagebox.showinfo("Success", "Database has been reset successfully!")
-            except Exception as e:
-                messagebox.showerror("Error", f"Failed to reset database: {str(e)}")
-    
+    def drop_tables_only(self):
+        try:
+            self.drop_tables()
+
+            self.update_dashboard_stats()
+            self.populate_table_list()
+            self.refresh_schema()
+
+            self.populate_search_tables()
+            self.search_column_combo['values'] = []
+            self.search_column_var.set('')
+
+            messagebox.showinfo("Success", "Tables dropped successfully!")
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to drop tables: {str(e)}")
+
+    def create_tables_only(self):
+        try:
+            login = LoginWindow(tk.Tk())
+            login.cursor = self.cursor
+            login.connection = self.connection
+            login.create_tables()
+
+            self.update_dashboard_stats()
+            self.populate_table_list()
+            self.refresh_schema()
+
+            messagebox.showinfo("Success", "Tables created successfully!")
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to create tables: {str(e)}")
+
+    def insert_sample_data_only(self):
+        try:
+            login = LoginWindow(tk.Tk())
+            login.cursor = self.cursor
+            login.connection = self.connection
+            login.populate_tables()
+
+            self.update_dashboard_stats()
+            self.populate_table_list()
+            self.refresh_schema()
+
+            messagebox.showinfo("Success", "Sample data inserted successfully!")
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to insert sample data: {str(e)}")
+
     def update_connection_status(self, message):
         self.connection_status.config(text=message)
     
