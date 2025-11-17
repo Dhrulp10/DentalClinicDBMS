@@ -11,8 +11,6 @@ A comprehensive Python GUI application for managing a dental clinic database usi
 - 📋 Database schema viewer
 - 🎯 User-friendly modern GUI
 
-![alt text](image.png)
-
 ## Prerequisites
 
 - Python 3.7+
