@@ -566,6 +566,21 @@ class DentalClinicApp:
         # Query dropdown with descriptions
         self.query_var = tk.StringVar()
         self.queries = [
+            ("Find patients from Toronto", "patients_from_toronto"),
+            ("Find all available surgery rooms", "available_surgery_rooms"),
+            ("Get upcoming appointments for scheduled patients", "upcoming_scheduled_appointments"),
+            ("Find distinct staff emails", "distinct_staff_emails"),
+            ("Find staff schedules longer than 8 hours", "long_staff_schedules"),
+            ("Get all dentists with specialization in Orthodontics", "orthodontic_dentists"),
+            ("List dental assistants with a specific certification", "certified_dental_assistants"),
+            ("Show receptionist staff details", "receptionist_details"),
+            ("Find staff assigned to a specific appointment with ID 1002", "staff_for_appointment_1002"),
+            ("Show dental actions costing more than $200", "expensive_dental_actions"),
+            ("Count treatments by type", "treatment_count_by_type"),
+            ("Get prescriptions for a specific medication 'Amoxicillin'", "prescriptions_amoxicillin"),
+            ("Show items low in stock (less than 40 units)", "low_stock_items"),
+            ("Find total items used per dental action", "total_items_used_per_action"),
+            ("List unpaid bills issued between 2025-09-01 and 2025-09-30", "unpaid_bills_september_2025"),
             ("Find least popular treatment types (occur less than 3 times)", "least_popular_treatments"),
             ("Find patients who had both treatments and prescriptions", "patients_both_treatment_prescription"),
             ("Find patients with appointments but no bills generated", "patients_no_bills"),
@@ -1394,6 +1409,97 @@ class DentalClinicApp:
     
     def get_query_sql(self, query_key):
         queries = {
+            "patients_from_toronto": """
+                SELECT patient_id, full_name, city, phone
+                FROM Patient
+                WHERE city = 'Toronto'
+                ORDER BY full_name ASC
+            """,
+            "available_surgery_rooms": """
+                SELECT room_number, room_type, capacity
+                FROM Room
+                WHERE room_type = 'Surgery'
+                AND availability = 'Y'
+            """,
+            "upcoming_scheduled_appointments": """
+                SELECT appointment_id, appointment_datetime, room_number
+                FROM Appointment
+                WHERE status = 'SCHEDULED'
+                AND appointment_datetime > CURRENT_TIMESTAMP
+                ORDER BY appointment_datetime ASC
+            """,
+            "distinct_staff_emails": """
+                SELECT DISTINCT email, salary
+                FROM Staff
+                WHERE email IS NOT NULL
+                ORDER BY salary DESC
+            """,
+            "long_staff_schedules": """
+                SELECT schedule_id, staff_id, start_time, end_time
+                FROM Staff_Schedule
+                WHERE (end_time - start_time) = INTERVAL '8' HOUR
+                ORDER BY start_time ASC
+            """,
+            "orthodontic_dentists": """
+                SELECT d.staff_id, s.name, d.license_no, d.specialization
+                FROM Dentist d
+                JOIN Staff s ON d.staff_id = s.staff_id
+                WHERE d.specialization = 'Orthodontics';
+            """,
+            "certified_dental_assistants": """
+                SELECT da.staff_id, s.name, da.certification
+                FROM Dental_Assistant da
+                JOIN Staff s ON da.staff_id = s.staff_id
+                WHERE da.certification LIKE '%Dental Assistant Level%';
+            """,
+            "receptionist_details": """
+                SELECT r.staff_id, s.name, s.phone
+                FROM Receptionist r
+                JOIN Staff s ON r.staff_id = s.staff_id
+                ORDER BY s.name ASC
+            """,
+            "staff_for_appointment_1002": """
+                SELECT a.appointment_id, s.name, s.email
+                FROM Appointment_Staff a
+                JOIN Staff s ON a.staff_id = s.staff_id
+                WHERE a.appointment_id = 1002
+            """,
+            "expensive_dental_actions": """
+                SELECT dental_action_id, appointment_id, cost
+                FROM Dental_Action
+                WHERE cost > 200
+                ORDER BY cost DESC;
+            """,
+            "treatment_count_by_type": """
+                SELECT type, COUNT(*) AS num_treatments
+                FROM Treatment
+                GROUP BY type
+                ORDER BY num_treatments DESC
+            """,
+            "prescriptions_amoxicillin": """
+                SELECT prescription_id, medication, dosage, duration
+                FROM Prescription
+                WHERE medication LIKE 'Amoxicillin%'
+            """,
+            "low_stock_items": """
+                SELECT item_id, item_name, quantity
+                FROM Inventory
+                WHERE quantity < 40
+                ORDER BY quantity ASC
+            """,
+            "total_items_used_per_action": """
+                SELECT dental_action_id, SUM(quantity_used) AS total_items_used
+                FROM DentalAction_Inventory
+                GROUP BY dental_action_id
+                ORDER BY total_items_used DESC
+            """,
+            "unpaid_bills_september_2025": """
+                SELECT bill_id, dental_action_id, total_amount, status, issue_date
+                FROM Bill
+                WHERE status = 'UNPAID'
+                AND issue_date BETWEEN '2025-09-01' AND '2025-09-30'
+                ORDER BY total_amount DESC;
+            """,
             "least_popular_treatments": """
                 SELECT t.type, COUNT(*) AS num_treatments
                 FROM Treatment t
