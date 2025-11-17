@@ -1430,7 +1430,7 @@ class DentalClinicApp:
             "long_staff_schedules": """
                 SELECT schedule_id, staff_id, start_time, end_time
                 FROM Staff_Schedule
-                WHERE (end_time - start_time) = INTERVAL '8' HOUR
+                WHERE (strftime('%s', end_time) - strftime('%s', start_time)) = 8 * 3600
                 ORDER BY start_time ASC
             """,
             "orthodontic_dentists": """
