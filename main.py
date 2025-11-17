@@ -902,7 +902,6 @@ class DentalClinicApp:
             self.table_combo['values'] = tables  # Also update the table browser combo
             
             if tables:
-                self.search_table_combo.set(tables[0])
                 self.update_search_columns()
         except Exception as e:
             print(f"Error loading tables: {str(e)}")
@@ -1270,10 +1269,6 @@ class DentalClinicApp:
             self.cursor.execute("SELECT name FROM sqlite_master WHERE type='table' ORDER BY name")
             tables = [table[0] for table in self.cursor.fetchall()]
             self.table_combo['values'] = tables
-            if tables:
-                self.table_var.set(tables[0])
-            else:
-                self.table_var.set("")
         except Exception as e:
             print(f"Error loading tables: {str(e)}")
             messagebox.showerror("Error", f"Failed to load tables: {str(e)}")
@@ -1680,8 +1675,6 @@ class DentalClinicApp:
             self.refresh_schema()
 
             self.populate_search_tables()
-            self.search_column_combo['values'] = []
-            self.search_column_var.set('')
 
             messagebox.showinfo("Success", "Tables dropped successfully!")
         except Exception as e:
@@ -1697,6 +1690,8 @@ class DentalClinicApp:
             self.update_dashboard_stats()
             self.populate_table_list()
             self.refresh_schema()
+
+            self.populate_search_tables()
 
             messagebox.showinfo("Success", "Tables created successfully!")
         except Exception as e:
