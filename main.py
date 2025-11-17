@@ -1,8 +1,6 @@
 import tkinter as tk
 from tkinter import ttk, messagebox, scrolledtext
 import sqlite3
-import os
-from datetime import datetime
 
 class LoginWindow:
     def __init__(self, root):
