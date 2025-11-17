@@ -1269,6 +1269,12 @@ class DentalClinicApp:
             self.cursor.execute("SELECT name FROM sqlite_master WHERE type='table' ORDER BY name")
             tables = [table[0] for table in self.cursor.fetchall()]
             self.table_combo['values'] = tables
+
+            if tables:
+                self.table_var.set(tables[0])
+            else:
+                self.table_var.set("")
+                
         except Exception as e:
             print(f"Error loading tables: {str(e)}")
             messagebox.showerror("Error", f"Failed to load tables: {str(e)}")
