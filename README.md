@@ -30,3 +30,14 @@ pip install -r requirements.txt
 
 ## Executable
 pyinstaller can be used to package this application for users
+
+
+## How to Run File  - Option 1 
+1. Download file
+2. Use any code editor of your choice
+3. Open Terminal and type python or python3 main.py
+
+## How to Run File - Option 2
+1. Go to Actions and select the OS and download the file
+2. Click on the file and if it doesnt load go to settings and go to "Privacy and Security". (MAC)
+3. Next click on open anyway and then open the file and click on "Connect and Login"
